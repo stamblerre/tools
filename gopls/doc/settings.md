@@ -2,9 +2,13 @@
 
 <!--TODO: Generate this file from the documentation in golang/org/x/tools/internal/lsp/source/options.go.-->
 
-This document describes the global settings for `gopls` inside the editor. The settings block will be called `"gopls"` and contains a collection of controls for `gopls` that the editor is not expected to understand or control. These settings can also be configured differently per workspace folder.
+This document describes the global settings for `gopls` inside the editor.
+The settings block will be called `"gopls"` and contains a collection of
+controls for `gopls` that the editor is not expected to understand or control.
+These settings can also be configured differently per workspace folder.
 
-In VSCode, this would be a section in your `settings.json` file that might look like this:
+In VSCode, this would be a section in your `settings.json` file that might look
+like this:
 
 ```json5
   "gopls": {
@@ -17,67 +21,183 @@ In VSCode, this would be a section in your `settings.json` file that might look 
 
 Below is the list of settings that are officially supported for `gopls`.
 
+Any settings that are experimental or for debugging purposes are marked as
+such.
+
 To enable all experimental features, use **allExperiments: `true`**. You will
 still be able to independently override specific experimental features.
 
 <!-- BEGIN User: DO NOT MANUALLY EDIT THIS SECTION -->
-### **buildFlags** *[]string*
+### Build
+
+#### **buildFlags** *[]string*
+
 buildFlags is the set of flags passed on to the build system when invoked.
 It is applied to queries like `go list`, which is used when discovering files.
 The most common use is to set `-tags`.
 
-
 Default: `[]`.
-### **env** *map[string]string*
+
+#### **env** *map[string]string*
+
 env adds environment variables to external commands run by `gopls`, most notably `go list`.
 
-
 Default: `{}`.
-### **hoverKind** *enum*
-hoverKind controls the information that appears in the hover text.
-SingleLine and Structured are intended for use only by authors of editor plugins.
-Must be one of:
 
- * `"FullDocumentation"`
- * `"NoDocumentation"`
- * `"SingleLine"`
- * `"Structured"` is an experimental setting that returns a structured hover format.
-This format separates the signature from the documentation, so that the client
-can do more manipulation of these fields.\
-This should only be used by clients that support this behavior.
+#### **directoryFilters** *[]string*
 
- * `"SynopsisDocumentation"`
+directoryFilters can be used to exclude unwanted directories from the
+workspace. By default, all directories are included. Filters are an
+operator, `+` to include and `-` to exclude, followed by a path prefix
+relative to the workspace folder. They are evaluated in order, and
+the last filter that applies to a path controls whether it is included.
+The path prefix can be empty, so an initial `-` excludes everything.
 
+Examples:
+Exclude node_modules: `-node_modules`
+Include only project_a: `-` (exclude everything), `+project_a`
+Include only project_a, but not node_modules inside it: `-`, `+project_a`, `-project_a/node_modules`
 
-Default: `"FullDocumentation"`.
-### **usePlaceholders** *bool*
-placeholders enables placeholders for function parameters or struct fields in completion responses.
+Default: `[]`.
 
+#### **expandWorkspaceToModule** *bool*
+
+Status: experimental
+
+expandWorkspaceToModule instructs `gopls` to adjust the scope of the
+workspace to find the best available module root. `gopls` first looks for
+a go.mod file in any parent directory of the workspace folder, expanding
+the scope to that directory if it exists. If no viable parent directory is
+found, gopls will check if there is exactly one child directory containing
+a go.mod file, narrowing the scope to that directory if it exists.
+
+Default: `true`.
+
+#### **experimentalWorkspaceModule** *bool*
+
+Status: experimental
+
+experimentalWorkspaceModule opts a user into the experimental support
+for multi-module workspaces.
 
 Default: `false`.
-### **linkTarget** *string*
-linkTarget controls where documentation links go.
-It might be one of:
 
-* `"godoc.org"`
-* `"pkg.go.dev"`
+#### **experimentalPackageCacheKey** *bool*
 
-If company chooses to use its own `godoc.org`, its address can be used as well.
+Status: experimental
 
+experimentalPackageCacheKey controls whether to use a coarser cache key
+for package type information to increase cache hits. This setting removes
+the user's environment, build flags, and working directory from the cache
+key, which should be a safe change as all relevant inputs into the type
+checking pass are already hashed into the key. This is temporarily guarded
+by an experiment because caching behavior is subtle and difficult to
+comprehensively test.
 
-Default: `"pkg.go.dev"`.
-### **local** *string*
-local is the equivalent of the `goimports -local` flag, which puts imports beginning with this string after 3rd-party packages.
-It should be the prefix of the import path whose imports should be grouped separately.
+Default: `true`.
 
+#### **allowModfileModifications** *bool*
+
+Status: experimental
+
+allowModfileModifications disables -mod=readonly, allowing imports from
+out-of-scope modules. This option will eventually be removed.
+
+Default: `false`.
+
+#### **allowImplicitNetworkAccess** *bool*
+
+Status: experimental
+
+allowImplicitNetworkAccess disables GOPROXY=off, allowing implicit module
+downloads rather than requiring user action. This option will eventually
+be removed.
+
+Default: `false`.
+
+### Formatting
+
+#### **local** *string*
+
+local is the equivalent of the `goimports -local` flag, which puts
+imports beginning with this string after third-party packages. It should
+be the prefix of the import path whose imports should be grouped
+separately.
 
 Default: `""`.
-### **gofumpt** *bool*
+
+#### **gofumpt** *bool*
+
 gofumpt indicates if we should run gofumpt formatting.
 
+Default: `false`.
+
+### UI
+
+#### **codelenses** *map[string]bool*
+
+codelenses overrides the enabled/disabled state of code lenses. See the "Code Lenses"
+section of settings.md for the list of supported lenses.
+
+Example Usage:
+
+```json5
+"gopls": {
+...
+  "codelens": {
+    "generate": false,  // Don't show the `go generate` lens.
+    "gc_details": true  // Show a code lens toggling the display of gc's choices.
+  }
+...
+}
+```
+
+Default: `{"gc_details":false,"generate":true,"regenerate_cgo":true,"tidy":true,"upgrade_dependency":true,"vendor":true}`.
+
+#### **semanticTokens** *bool*
+
+Status: experimental
+
+semanticTokens controls whether the LSP server will send
+semantic tokens to the client.
 
 Default: `false`.
-### **analyses** *map[string]bool*
+
+#### Completion
+
+##### **usePlaceholders** *bool*
+
+placeholders enables placeholders for function parameters or struct fields in completion responses.
+
+Default: `false`.
+
+##### **completionBudget** *time.Duration*
+
+Status: debug
+
+completionBudget is the soft latency goal for completion requests. Most
+requests finish in a couple milliseconds, but in some cases deep
+completions can take much longer. As we use up our budget we
+dynamically reduce the search scope to ensure we return timely
+results. Zero means unlimited.
+
+Default: `"100ms"`.
+
+##### **matcher** *enum*
+
+matcher sets the algorithm that is used when calculating completion candidates.
+Must be one of:
+
+ * `"CaseInsensitive"`
+ * `"CaseSensitive"`
+ * `"Fuzzy"`
+
+Default: `"Fuzzy"`.
+
+#### Diagnostic
+
+##### **analyses** *map[string]bool*
+
 analyses specify analyses that the user would like to enable or disable.
 A map of the names of analysis passes that should be enabled/disabled.
 A full list of analyzers that gopls uses can be found [here](analyzers.md)
@@ -92,32 +212,84 @@ Example Usage:
 ...
 ```
 
+Default: `{}`.
+
+##### **staticcheck** *bool*
+
+Status: experimental
+
+staticcheck enables additional analyses from staticcheck.io.
+
+Default: `false`.
+
+##### **annotations** *map[string]bool*
+
+Status: experimental
+
+annotations suppress various kinds of optimization diagnostics
+that would be reported by the gc_details command.
+ * noNilcheck suppresses display of nilchecks.
+ * noEscape suppresses escape choices.
+ * noInline suppresses inlining choices.
+ * noBounds suppresses bounds checking diagnostics.
 
 Default: `{}`.
-### **codelenses** *map[string]bool*
-codelenses overrides the enabled/disabled state of code lenses. See the "Code Lenses"
-section of settings.md for the list of supported lenses.
 
-Example Usage:
-```json5
-"gopls": {
-...
-  "codelenses": {
-    "generate": false,  // Don't show the `go generate` lens.
-    "gc_details": true  // Show a code lens toggling the display of gc's choices.
-  }
-...
-}
-```
+##### **experimentalDiagnosticsDelay** *time.Duration*
 
+Status: experimental
 
-Default: `{"gc_details":false,"generate":true,"regenerate_cgo":true,"tidy":true,"upgrade_dependency":true,"vendor":true}`.
-### **linksInHover** *bool*
+experimentalDiagnosticsDelay controls the amount of time that gopls waits
+after the most recent file modification before computing deep diagnostics.
+Simple diagnostics (parsing and type-checking) are always run immediately
+on recently modified packages.
+
+This option must be set to a valid duration string, for example `"250ms"`.
+
+Default: `"250ms"`.
+
+#### Documentation
+
+##### **hoverKind** *enum*
+
+hoverKind controls the information that appears in the hover text.
+SingleLine and Structured are intended for use only by authors of editor plugins.
+Must be one of:
+
+ * `"FullDocumentation"`
+ * `"NoDocumentation"`
+ * `"SingleLine"`
+ * `"Structured"` is an experimental setting that returns a structured hover format.
+This format separates the signature from the documentation, so that the client
+can do more manipulation of these fields.\
+This should only be used by clients that support this behavior.
+
+ * `"SynopsisDocumentation"`
+
+Default: `"FullDocumentation"`.
+
+##### **linkTarget** *string*
+
+linkTarget controls where documentation links go.
+It might be one of:
+
+* `"godoc.org"`
+* `"pkg.go.dev"`
+
+If company chooses to use its own `godoc.org`, its address can be used as well.
+
+Default: `"pkg.go.dev"`.
+
+##### **linksInHover** *bool*
+
 linksInHover toggles the presence of links to documentation in hover.
 
-
 Default: `true`.
-### **importShortcut** *enum*
+
+#### Navigation
+
+##### **importShortcut** *enum*
+
 importShortcut specifies whether import statements should link to
 documentation or go to definitions.
 Must be one of:
@@ -126,19 +298,10 @@ Must be one of:
  * `"Definition"`
  * `"Link"`
 
-
 Default: `"Both"`.
-### **matcher** *enum*
-matcher sets the algorithm that is used when calculating completion candidates.
-Must be one of:
 
- * `"CaseInsensitive"`
- * `"CaseSensitive"`
- * `"Fuzzy"`
+##### **symbolMatcher** *enum*
 
-
-Default: `"Fuzzy"`.
-### **symbolMatcher** *enum*
 symbolMatcher sets the algorithm that is used when finding workspace symbols.
 Must be one of:
 
@@ -146,9 +309,10 @@ Must be one of:
  * `"CaseSensitive"`
  * `"Fuzzy"`
 
-
 Default: `"Fuzzy"`.
-### **symbolStyle** *enum*
+
+##### **symbolStyle** *enum*
+
 symbolStyle controls how symbols are qualified in symbol responses.
 
 Example Usage:
@@ -173,123 +337,17 @@ just "Foo.Field".
 "pkg.Foo.Field".
 
 
-
 Default: `"Dynamic"`.
-### **directoryFilters** *[]string*
-directoryFilters can be used to exclude unwanted directories from the
-workspace. By default, all directories are included. Filters are an
-operator, `+` to include and `-` to exclude, followed by a path prefix
-relative to the workspace folder. They are evaluated in order, and
-the last filter that applies to a path controls whether it is included.
-The path prefix can be empty, so an initial `-` excludes everything.
 
-Examples:
-Exclude node_modules: `-node_modules`
-Include only project_a: `-` (exclude everything), `+project_a`
-Include only project_a, but not node_modules inside it: `-`, `+project_a`, `-project_a/node_modules`
+#### **verboseOutput** *bool*
 
+Status: debug
 
-Default: `[]`.
-<!-- END User: DO NOT MANUALLY EDIT THIS SECTION -->
-
-## Experimental
-
-The below settings are considered experimental. They may be deprecated or changed in the future. They are typically used to test experimental opt-in features or to disable features.
-
-<!-- BEGIN Experimental: DO NOT MANUALLY EDIT THIS SECTION -->
-### **annotations** *map[string]bool*
-annotations suppress various kinds of optimization diagnostics
-that would be reported by the gc_details command.
- * noNilcheck suppresses display of nilchecks.
- * noEscape suppresses escape choices.
- * noInline suppresses inlining choices.
- * noBounds suppresses bounds checking diagnostics.
-
-
-Default: `{}`.
-### **staticcheck** *bool*
-staticcheck enables additional analyses from staticcheck.io.
-
-
-Default: `false`.
-### **semanticTokens** *bool*
-semanticTokens controls whether the LSP server will send
-semantic tokens to the client.
-
-
-Default: `false`.
-### **expandWorkspaceToModule** *bool*
-expandWorkspaceToModule instructs `gopls` to adjust the scope of the
-workspace to find the best available module root. `gopls` first looks for
-a go.mod file in any parent directory of the workspace folder, expanding
-the scope to that directory if it exists. If no viable parent directory is
-found, gopls will check if there is exactly one child directory containing
-a go.mod file, narrowing the scope to that directory if it exists.
-
-
-Default: `true`.
-### **experimentalWorkspaceModule** *bool*
-experimentalWorkspaceModule opts a user into the experimental support
-for multi-module workspaces.
-
-
-Default: `false`.
-### **experimentalDiagnosticsDelay** *time.Duration*
-experimentalDiagnosticsDelay controls the amount of time that gopls waits
-after the most recent file modification before computing deep diagnostics.
-Simple diagnostics (parsing and type-checking) are always run immediately
-on recently modified packages.
-
-This option must be set to a valid duration string, for example `"250ms"`.
-
-
-Default: `"250ms"`.
-### **experimentalPackageCacheKey** *bool*
-experimentalPackageCacheKey controls whether to use a coarser cache key
-for package type information to increase cache hits. This setting removes
-the user's environment, build flags, and working directory from the cache
-key, which should be a safe change as all relevant inputs into the type
-checking pass are already hashed into the key. This is temporarily guarded
-by an experiment because caching behavior is subtle and difficult to
-comprehensively test.
-
-
-Default: `true`.
-### **allowModfileModifications** *bool*
-allowModfileModifications disables -mod=readonly, allowing imports from
-out-of-scope modules. This option will eventually be removed.
-
-
-Default: `false`.
-### **allowImplicitNetworkAccess** *bool*
-allowImplicitNetworkAccess disables GOPROXY=off, allowing implicit module
-downloads rather than requiring user action. This option will eventually
-be removed.
-
-
-Default: `false`.
-<!-- END Experimental: DO NOT MANUALLY EDIT THIS SECTION -->
-
-## Debugging
-
-The below settings are for use in debugging `gopls`. Like the experimental options, they may be deprecated or changed in the future.
-
-<!-- BEGIN Debugging: DO NOT MANUALLY EDIT THIS SECTION -->
-### **verboseOutput** *bool*
 verboseOutput enables additional debug logging.
 
-
 Default: `false`.
-### **completionBudget** *time.Duration*
-completionBudget is the soft latency goal for completion requests. Most
-requests finish in a couple milliseconds, but in some cases deep
-completions can take much longer. As we use up our budget we
-dynamically reduce the search scope to ensure we return timely
-results. Zero means unlimited.
 
-
-Default: `"100ms"`.
-<!-- END Debugging: DO NOT MANUALLY EDIT THIS SECTION -->
+<!-- END User: DO NOT MANUALLY EDIT THIS SECTION -->
 
 ## Code Lenses
 
